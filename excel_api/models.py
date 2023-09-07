@@ -1,8 +1,17 @@
 from django.db import models
 
 
+class CSVFile(models.Model):
+    file = models.FileField(upload_to='csv_files/')
+    uploaded_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.file.name
+
+
 class ExcelFile(models.Model):
     file = models.FileField(upload_to='excel_files/')
+    csv_file = models.FileField(upload_to='csv_files/', null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
