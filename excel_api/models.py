@@ -2,7 +2,7 @@ from django.db import models
 
 
 class CSVFile(models.Model):
-    file = models.FileField(upload_to='csv_files/')
+    file = models.FileField(upload_to='csvfiles/')
     uploaded_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -11,7 +11,7 @@ class CSVFile(models.Model):
 
 class ExcelFile(models.Model):
     file = models.FileField(upload_to='excel_files/')
-    csv_file = models.FileField(upload_to='csv_files/', null=True, blank=True)
+    csv_file = models.FileField(upload_to='csvfiles/', null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

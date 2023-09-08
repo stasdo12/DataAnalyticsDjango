@@ -1,3 +1,5 @@
+from venv import logger
+
 from django.core.files.base import ContentFile
 from rest_framework import generics
 from rest_framework.response import Response
@@ -16,18 +18,27 @@ class ExcelFileCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         excel_file = serializer.save()
-        print(excel_file)
 
-        excel_data = pd.read_excel(excel_file.file)
+        try:
+            excel_data = pd.read_excel(excel_file.file)
+            print(excel_data)
+            csv_data = excel_data.to_csv(index=False)
 
-        csv_data = excel_data.to_csv(index=False)
+            csv_filename = f"csvfiles/{excel_file.file.name.split('/')[-1].split('.')[0]}.csv"
 
-        csv_filename = f"{excel_file.file.name.split('/')[-1].split('.')[0]}.csv"
-        csv_file_obj = CSVFile.objects.create()
-        csv_file_obj.file.save(csv_filename, ContentFile(csv_data), save=True)
+            csv_file_obj = CSVFile()
+            csv_file_obj.file.save(csv_filename, ContentFile(csv_data), save=True)
+            print(csv_file_obj)
+            csv_file_obj.file.save(csv_filename, ContentFile(csv_data), save=True)
+            print("csv_file_obj saved")
 
-        excel_file.csv_file = csv_file_obj
-        excel_file.save()
+            excel_file.csv_file = csv_file_obj
+            excel_file.save()
+            print("ExcelFile object updated")
+
+        except Exception as e:
+            logger.error(f"Error creating CSV file: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ExcelFileColumnsView(generics.RetrieveAPIView):
