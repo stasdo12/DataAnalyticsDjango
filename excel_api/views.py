@@ -1,6 +1,7 @@
-from venv import logger
+
 
 from django.core.files.base import ContentFile
+from django.template.base import logger
 from rest_framework import generics
 from rest_framework.response import Response
 
@@ -29,9 +30,6 @@ class ExcelFileCreateView(generics.CreateAPIView):
             csv_file_obj = CSVFile()
             csv_file_obj.file.save(csv_filename, ContentFile(csv_data), save=True)
             print(csv_file_obj)
-            csv_file_obj.file.save(csv_filename, ContentFile(csv_data), save=True)
-            print("csv_file_obj saved")
-
             excel_file.csv_file = csv_file_obj
             excel_file.save()
             print("ExcelFile object updated")
@@ -48,12 +46,14 @@ class ExcelFileColumnsView(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
 
-        if instance.csv_file:
-            csv_data = pd.read_csv(instance.csv_file)
+        if instance.csv_file_id:
+            csv_file = CSVFile.objects.get(pk=instance.csv_file_id)
+
+            csv_data = pd.read_csv(csv_file.file.path, encoding='cp1251')
             columns = list(csv_data.columns)
             return Response({'columns': columns})
         else:
-            return Response({'error': 'No associated CSV file.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Нет связанного файла CSV.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ExcelFileListView(generics.ListAPIView):

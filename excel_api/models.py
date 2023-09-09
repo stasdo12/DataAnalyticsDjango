@@ -11,8 +11,9 @@ class CSVFile(models.Model):
 
 class ExcelFile(models.Model):
     file = models.FileField(upload_to='excel_files/')
-    csv_file = models.FileField(upload_to='csvfiles/', null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now=True)
+
+    csv_file = models.ForeignKey(CSVFile, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.file.name
