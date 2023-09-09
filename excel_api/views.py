@@ -58,27 +58,16 @@ class ExcelFileColumnsView(generics.RetrieveAPIView):
             columns = list(csv_data.columns)
             return Response({'columns': columns})
         else:
-            return Response({'error': 'Нет связанного файла CSV.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'No associated CSV file.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ExcelFileDocumentView(generics.RetrieveAPIView):
     queryset = ExcelFile.objects.all()
     serializer_class = ExcelFileSerializer
 
-    @staticmethod
-    def calculate_average(csv_data, column_name, start_row_index=0):
-        if column_name in csv_data.columns:
-            column = csv_data[column_name].iloc[start_row_index:]
-            try:
-                average = column.astype(float).mean()
-                return average
-            except ValueError:
-                return None
-        else:
-            return None
-
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
+        function = request.query_params.get('function')
         column_name = request.query_params.get('column_name')
 
         if instance.csv_file_id:
@@ -90,20 +79,27 @@ class ExcelFileDocumentView(generics.RetrieveAPIView):
                 json_data = first_15_records.to_json(orient='records', force_ascii=False)
 
                 if column_name is not None and column_name != "":
-
-                    average = self.calculate_average(csv_data, column_name)
-
-                    if average is not None:
+                    if function == 'avg':
+                        average = csv_data[column_name].mean()
                         return Response({'Average': average})
+                    elif function == 'sum':
+                        total_sum = csv_data[column_name].sum()
+                        return Response({'Sum': total_sum})
+                    elif function == 'min':
+                        min_value = csv_data[column_name].min()
+                        return Response({'Min': min_value})
+                    elif function == 'max':
+                        max_value = csv_data[column_name].max()
+                        return Response({'Max': max_value})
                     else:
-                        return Response({'error': f'Столбец {column_name} не найден в файле или данные не могут быть обработаны.'}, status=status.HTTP_400_BAD_REQUEST)
+                        return Response({'error': 'Invalid function. Supported functions: average, sum, min, max'},
+                                        status=status.HTTP_400_BAD_REQUEST)
                 else:
-
                     return Response({'document': json.loads(json_data)})
             except UnicodeDecodeError:
-                return Response({'error': 'Ошибка декодирования файла.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response({'error': 'File decoding error.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
-            return Response({'error': 'Нет связанного файла CSV.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'No associated CSV file.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DataAnalysisView(generics.RetrieveAPIView):
