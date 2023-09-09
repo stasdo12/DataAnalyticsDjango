@@ -91,6 +91,9 @@ class ExcelFileDocumentView(generics.RetrieveAPIView):
                     elif function == 'max':
                         max_value = csv_data[column_name].max()
                         return Response({'Max': max_value})
+                    elif function == 'mult':
+                        multiply_value = csv_data[column_name].prod()
+                        return Response({"Multiply": multiply_value})
                     else:
                         return Response({'error': 'Invalid function. Supported functions: average, sum, min, max'},
                                         status=status.HTTP_400_BAD_REQUEST)
