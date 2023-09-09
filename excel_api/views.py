@@ -90,7 +90,7 @@ class ExcelFileDocumentView(generics.RetrieveAPIView):
                 json_data = first_15_records.to_json(orient='records', force_ascii=False)
 
                 if column_name is not None and column_name != "":
-                    # Если параметр column_name указан, выполняем расчет
+
                     average = self.calculate_average(csv_data, column_name)
 
                     if average is not None:
@@ -98,7 +98,7 @@ class ExcelFileDocumentView(generics.RetrieveAPIView):
                     else:
                         return Response({'error': f'Столбец {column_name} не найден в файле или данные не могут быть обработаны.'}, status=status.HTTP_400_BAD_REQUEST)
                 else:
-                    # Если параметр column_name отсутствует или пустой, возвращаем документ целиком
+
                     return Response({'document': json.loads(json_data)})
             except UnicodeDecodeError:
                 return Response({'error': 'Ошибка декодирования файла.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
