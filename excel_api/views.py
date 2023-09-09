@@ -1,4 +1,4 @@
-
+import json
 
 from django.core.files.base import ContentFile
 from django.template.base import logger
@@ -11,6 +11,11 @@ import pandas as pd
 import regex as re
 from rest_framework import status
 import matplotlib.pyplot as plt
+
+
+class ExcelFileListView(generics.ListAPIView):
+    queryset = ExcelFile.objects.all()
+    serializer_class = ExcelFileSerializer
 
 
 class ExcelFileCreateView(generics.CreateAPIView):
@@ -56,9 +61,49 @@ class ExcelFileColumnsView(generics.RetrieveAPIView):
             return Response({'error': 'Нет связанного файла CSV.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ExcelFileListView(generics.ListAPIView):
+class ExcelFileDocumentView(generics.RetrieveAPIView):
     queryset = ExcelFile.objects.all()
     serializer_class = ExcelFileSerializer
+
+    @staticmethod
+    def calculate_average(csv_data, column_name, start_row_index=0):
+        if column_name in csv_data.columns:
+            column = csv_data[column_name].iloc[start_row_index:]
+            try:
+                average = column.astype(float).mean()
+                return average
+            except ValueError:
+                return None
+        else:
+            return None
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        column_name = request.query_params.get('column_name')
+
+        if instance.csv_file_id:
+            csv_file = CSVFile.objects.get(pk=instance.csv_file_id)
+
+            try:
+                csv_data = pd.read_csv(csv_file.file.path, encoding='cp1251')
+                first_15_records = csv_data.head(15)
+                json_data = first_15_records.to_json(orient='records', force_ascii=False)
+
+                if column_name is not None and column_name != "":
+                    # Если параметр column_name указан, выполняем расчет
+                    average = self.calculate_average(csv_data, column_name)
+
+                    if average is not None:
+                        return Response({'Average': average})
+                    else:
+                        return Response({'error': f'Столбец {column_name} не найден в файле или данные не могут быть обработаны.'}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    # Если параметр column_name отсутствует или пустой, возвращаем документ целиком
+                    return Response({'document': json.loads(json_data)})
+            except UnicodeDecodeError:
+                return Response({'error': 'Ошибка декодирования файла.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response({'error': 'Нет связанного файла CSV.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DataAnalysisView(generics.RetrieveAPIView):
