@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 from django.core.files.base import ContentFile
 from django.template.base import logger
 from rest_framework import generics
@@ -140,14 +141,30 @@ class DataVisualizationView(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
 
-        csv_data = pd.read_csv(instance.csv_file)
+        if instance.csv_file_id:
+            csv_file = CSVFile.objects.get(pk=instance.csv_file_id)
 
-        plt.hist(csv_data['data_column'])
-        plt.xlabel('Values')
-        plt.ylabel('Frequency')
-        plt.title('Histogram')
+            try:
+                csv_data = pd.read_csv(csv_file.file.path, encoding='cp1251')
+                data_column_name = 'data'
+                income_column_name = 'income'
 
-        image_filename = f"{instance.csv_file.name.split('/')[-1].split('.')[0]}_histogram.png"
-        plt.savefig(f'media/{image_filename}')
+                x_labels = np.arange(len(csv_data))
 
-        return Response({'image_url': f'/media/{image_filename}'})
+                plt.figure(figsize=(12, 8))
+                plt.plot(x_labels, csv_data[income_column_name], marker='o', linestyle='-', markersize=5)
+
+                plt.xticks(x_labels, csv_data[data_column_name], rotation=45, fontsize=10)
+
+                plt.xlabel('Дата')
+                plt.ylabel(income_column_name)
+                plt.title('Линейный график дохода')
+
+                image_filename = f"{csv_file.file.name.split('/')[-1].split('.')[0]}_line_plot.png"
+                plt.savefig(f'media/{image_filename}')
+
+                return Response({'image_url': f'/media/{image_filename}'})
+            except UnicodeDecodeError:
+                return Response({'error': 'Ошибка декодирования файла.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response({'error': 'Нет связанного CSV файла.'}, status=status.HTTP_400_BAD_REQUEST)
