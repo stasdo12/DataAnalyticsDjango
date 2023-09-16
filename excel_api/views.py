@@ -11,7 +11,8 @@ from .serializers import ExcelFileSerializer
 import pandas as pd
 import regex as re
 from rest_framework import status
-import matplotlib.pyplot as plt
+import plotly.graph_objs as go
+from plotly.subplots import make_subplots
 
 
 class ExcelFileListView(generics.ListAPIView):
@@ -113,23 +114,22 @@ class DataAnalysisView(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
 
-        csv_data = pd.read_csv(instance.csv_file)
+        csv_data = pd.read_csv(instance.csv_file.file.path)
 
-        operation = request.query_params.get('operation')
-        if operation == 'regex_search':
-            column_name = request.query_params.get('column_name')
-            pattern = request.query_params.get('pattern')
+        pattern = request.query_params.get('pattern')
 
-            if column_name and pattern:
-                try:
-                    matched_data = csv_data[csv_data[column_name].str.contains(pattern, flags=re.IGNORECASE, na=False)]
-                    result = matched_data.to_dict(orient='records')
-                except KeyError:
-                    return Response({'error': 'Invalid column name'}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                return Response({'error': 'Column name and pattern are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if pattern:
+            pattern = pattern.strip()
+
+            try:
+                csv_data = csv_data.astype(str)
+                matched_data = csv_data.applymap(lambda x: bool(re.search(pattern, str(x), re.IGNORECASE)))
+                matched_data = matched_data.any(axis=1)
+                result = csv_data[matched_data].to_dict(orient='records')
+            except KeyError:
+                return Response({'error': 'Invalid column name'}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            return Response({'error': 'Invalid operation.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Pattern is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'result': result})
 
@@ -145,23 +145,51 @@ class DataVisualizationView(generics.RetrieveAPIView):
             csv_file = CSVFile.objects.get(pk=instance.csv_file_id)
 
             try:
-                csv_data = pd.read_csv(csv_file.file.path, encoding='cp1251')
-                data_column_name = 'data'
-                income_column_name = 'income'
+                csv_data = pd.read_csv(csv_file.file.path, encoding='cp1251', parse_dates=['Date'])
 
-                x_labels = np.arange(len(csv_data))
+                income_column_name = 'Income'
+                expense_columns = [
+                    "Housing Expenses",
+                    "Food",
+                    "Transportation",
+                    "Health and Medical Expenses",
+                    "Education",
+                    "Entertainment and Hobbies",
+                    "Personal Expenses",
+                    "Other Expenses",
+                ]
 
-                plt.figure(figsize=(12, 8))
-                plt.plot(x_labels, csv_data[income_column_name], marker='o', linestyle='-', markersize=5)
+                csv_data['Total Expenses'] = csv_data[expense_columns].sum(axis=1)
 
-                plt.xticks(x_labels, csv_data[data_column_name], rotation=45, fontsize=10)
+                csv_data['Remaining Money'] = csv_data[income_column_name] - csv_data['Total Expenses']
 
-                plt.xlabel('Дата')
-                plt.ylabel(income_column_name)
-                plt.title('Линейный график дохода')
+                csv_data.set_index('Date', inplace=True)
 
-                image_filename = f"{csv_file.file.name.split('/')[-1].split('.')[0]}_line_plot.png"
-                plt.savefig(f'media/{image_filename}')
+                x_labels = csv_data.index
+
+                fig = make_subplots(rows=1, cols=1)
+
+                for expense_category in expense_columns:
+                    fig.add_trace(
+                        go.Scatter(x=x_labels, y=csv_data[expense_category], mode='lines', stackgroup='expenses',
+                                   name=expense_category))
+
+                fig.add_trace(go.Scatter(x=x_labels, y=csv_data[income_column_name], mode='lines', name='Доход'))
+
+                fig.update_layout(
+                    xaxis=dict(
+                        title='Дата',
+                        tickangle=-45,
+                        tickfont=dict(size=10),
+                    ),
+                    yaxis=dict(
+                        title='Доход / Расход',
+                    ),
+                    title='График дохода и расходов',
+                )
+
+                image_filename = f"{csv_file.file.name.split('/')[-1].split('.')[0]}_income_expense_plot.png"
+                fig.write_image(f'media/{image_filename}')
 
                 return Response({'image_url': f'/media/{image_filename}'})
             except UnicodeDecodeError:
