@@ -147,21 +147,10 @@ class DataVisualizationView(generics.RetrieveAPIView):
             try:
                 csv_data = pd.read_csv(csv_file.file.path, encoding='cp1251', parse_dates=['Date'])
 
-                income_column_name = 'Income'
-                expense_columns = [
-                    "Housing Expenses",
-                    "Food",
-                    "Transportation",
-                    "Health and Medical Expenses",
-                    "Education",
-                    "Entertainment and Hobbies",
-                    "Personal Expenses",
-                    "Other Expenses",
-                ]
+                columns = [col for col in csv_data.columns if col not in ['Date', 'Income']]
 
-                csv_data['Total Expenses'] = csv_data[expense_columns].sum(axis=1)
-
-                csv_data['Remaining Money'] = csv_data[income_column_name] - csv_data['Total Expenses']
+                csv_data['Total Expenses'] = csv_data[columns].sum(axis=1)
+                csv_data['Remaining Money'] = csv_data['Income'] - csv_data['Total Expenses']
 
                 csv_data.set_index('Date', inplace=True)
 
@@ -169,12 +158,12 @@ class DataVisualizationView(generics.RetrieveAPIView):
 
                 fig = make_subplots(rows=1, cols=1)
 
-                for expense_category in expense_columns:
+                for expense_category in columns:
                     fig.add_trace(
                         go.Scatter(x=x_labels, y=csv_data[expense_category], mode='lines', stackgroup='expenses',
                                    name=expense_category))
 
-                fig.add_trace(go.Scatter(x=x_labels, y=csv_data[income_column_name], mode='lines', name='Доход'))
+                fig.add_trace(go.Scatter(x=x_labels, y=csv_data['Income'], mode='lines', name='Доход'))
 
                 fig.update_layout(
                     xaxis=dict(
